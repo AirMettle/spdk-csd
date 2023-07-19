@@ -2,6 +2,7 @@
  *   Copyright (C) 2016 Intel Corporation. All rights reserved.
  *   Copyright (c) 2019 Mellanox Technologies LTD. All rights reserved.
  *   Copyright (c) 2021-2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ *   Copyright (C) 2023 AirMettle, Inc. All rights reserved.
  */
 
 #include "spdk/stdinc.h"
@@ -8592,6 +8593,10 @@ spdk_bdev_copy_blocks(struct spdk_bdev_desc *desc, struct spdk_io_channel *ch,
 
 	bdev_io_submit(bdev_io);
 	return 0;
+}
+
+bool spdk_bdev_check_desc_write(struct spdk_bdev_desc *desc) {
+        return desc->write;
 }
 
 SPDK_LOG_REGISTER_COMPONENT(bdev)

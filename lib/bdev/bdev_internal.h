@@ -1,6 +1,7 @@
 /*   SPDX-License-Identifier: BSD-3-Clause
  *   Copyright (C) 2019 Intel Corporation.
  *   All rights reserved.
+ *   Copyright (C) 2023 AirMettle, Inc. All rights reserved.
  */
 
 #ifndef SPDK_BDEV_INTERNAL_H
@@ -30,5 +31,7 @@ typedef void (*bdev_reset_device_stat_cb)(struct spdk_bdev *bdev, void *cb_arg, 
 
 void bdev_reset_device_stat(struct spdk_bdev *bdev, enum spdk_bdev_reset_stat_mode mode,
 			    bdev_reset_device_stat_cb cb, void *cb_arg);
+
+bool spdk_bdev_check_desc_write(struct spdk_bdev_desc *desc);
 
 #endif /* SPDK_BDEV_INTERNAL_H */

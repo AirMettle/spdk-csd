@@ -2,6 +2,7 @@
  *   Copyright (C) 2016 Intel Corporation. All rights reserved.
  *   Copyright (c) 2019 Mellanox Technologies LTD. All rights reserved.
  *   Copyright (c) 2021 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ *   Copyright (C) 2023 AirMettle, Inc. All rights reserved.
  */
 
 /** \file
@@ -120,6 +121,13 @@ enum spdk_bdev_io_type {
 	SPDK_BDEV_IO_TYPE_SEEK_HOLE,
 	SPDK_BDEV_IO_TYPE_SEEK_DATA,
 	SPDK_BDEV_IO_TYPE_COPY,
+	SPDK_BDEV_IO_KV_LIST,
+	SPDK_BDEV_IO_KV_DELETE,
+	SPDK_BDEV_IO_KV_EXIST,
+	SPDK_BDEV_IO_KV_STORE,
+	SPDK_BDEV_IO_KV_RETRIEVE,
+	SPDK_BDEV_IO_KV_SEND_SELECT,
+	SPDK_BDEV_IO_KV_RETRIEVE_SELECT,
 	SPDK_BDEV_NUM_IO_TYPES /* Keep last */
 };
 
@@ -2057,6 +2065,57 @@ void spdk_bdev_for_each_channel_continue(struct spdk_bdev_channel_iter *i, int s
  */
 void spdk_bdev_for_each_channel(struct spdk_bdev *bdev, spdk_bdev_for_each_channel_msg fn,
 				void *ctx, spdk_bdev_for_each_channel_done cpl);
+
+/*
+ * KV commands
+ */
+
+#define NVME_KV_MAX_KEY_LENGTH 16
+#define NVME_KV_STORE_CMD_OPTION_MUST_EXIST 0x01
+#define NVME_KV_STORE_CMD_OPTION_MUST_NOT_EXIST 0x02
+#define NVME_KV_STORE_CMD_OPTION_NOT_COMPRESS 0x04
+#define NVME_KV_STORE_CMD_OPTION_APPEND 0x08
+#define NVME_KV_SELECT_CMD_OPTION_DO_NOT_FREE 0x02
+#define NVME_KV_SELECT_CMD_OPTION_DO_NOT_FREE_IF_NOT_ALL_DATA_FETCHED 0x02
+#define NVME_KV_SELECT_CMD_OUTPUT_TYPE_USE_CSV_HEADERS_INPUT 0x01
+#define NVME_KV_SELECT_CMD_OUTPUT_TYPE_USE_CSV_HEADERS_OUTPUT 0x02
+#define NVME_KV_SELECT_TYPE_CSV 0
+#define NVME_KV_SELECT_TYPE_JSON 1
+#define NVME_KV_SELECT_TYPE_PARQUET 2
+
+int spdk_bdev_kv_list(struct spdk_bdev_desc *desc, struct spdk_io_channel *ch,
+                   unsigned char *key, size_t key_length,
+		   void *buf, uint64_t nbytes,
+		   spdk_bdev_io_completion_cb cb, void *cb_arg);
+
+int spdk_bdev_kv_exist(struct spdk_bdev_desc *desc, struct spdk_io_channel *ch,
+                   unsigned char *key, size_t key_length,
+		   spdk_bdev_io_completion_cb cb, void *cb_arg);
+
+int spdk_bdev_kv_delete(struct spdk_bdev_desc *desc, struct spdk_io_channel *ch,
+                   unsigned char *key, size_t key_length,
+		   spdk_bdev_io_completion_cb cb, void *cb_arg);
+
+int spdk_bdev_kv_store(struct spdk_bdev_desc *desc, struct spdk_io_channel *ch,
+                   unsigned char *key, size_t key_length,
+                   void *buf, uint64_t nbytes, uint8_t options,
+                   spdk_bdev_io_completion_cb cb, void *cb_arg);
+
+int spdk_bdev_kv_retrieve(struct spdk_bdev_desc *desc, struct spdk_io_channel *ch,
+                   unsigned char *key, size_t key_length,
+		   void *buf, uint64_t offset, uint64_t nbytes,
+                   spdk_bdev_io_completion_cb cb, void *cb_arg);
+
+int spdk_bdev_kv_send_select(struct spdk_bdev_desc *desc, struct spdk_io_channel *ch,
+                   unsigned char *key, size_t key_length,
+                   void *buf, uint64_t nbytes, uint8_t options,
+                   uint8_t input_type, uint8_t output_type,
+                   spdk_bdev_io_completion_cb cb, void *cb_arg);
+
+int spdk_bdev_kv_retrieve_select(struct spdk_bdev_desc *desc, struct spdk_io_channel *ch,
+		   void *buf, uint64_t offset, uint64_t nbytes,
+                   uint32_t select_id, uint8_t options,
+                   spdk_bdev_io_completion_cb cb, void *cb_arg);
 
 #ifdef __cplusplus
 }

@@ -1093,6 +1093,68 @@ spdk_nvme_ns_cmd_copy(struct spdk_nvme_ns *ns, struct spdk_nvme_qpair *qpair,
 	return ut_submit_nvme_request(ns, qpair, SPDK_NVME_OPC_COPY, cb_fn, cb_arg);
 }
 
+// add trivial implementation for this test to compile
+int
+spdk_nvme_ns_cmd_kvlist(struct spdk_nvme_ns *ns, struct spdk_nvme_qpair *qpair,
+			unsigned char *prefix, size_t prefix_len,
+			void *buffer, uint64_t buffer_size,
+			spdk_nvme_cmd_cb cb_fn, void *cb_arg, uint32_t io_flags) {
+	return 0;
+}
+
+int
+spdk_nvme_ns_cmd_kvdelete(struct spdk_nvme_ns *ns, struct spdk_nvme_qpair *qpair,
+			  unsigned char *key, size_t key_len,
+			  spdk_nvme_cmd_cb cb_fn, void *cb_arg,
+			  uint32_t io_flags) {
+	return 0;
+}
+
+int
+spdk_nvme_ns_cmd_kvexist(struct spdk_nvme_ns *ns, struct spdk_nvme_qpair *qpair,
+			  unsigned char *key, size_t key_len,
+			  spdk_nvme_cmd_cb cb_fn, void *cb_arg,
+			  uint32_t io_flags) {
+	return 0;
+}
+
+int
+spdk_nvme_ns_cmd_kvstore(struct spdk_nvme_ns *ns, struct spdk_nvme_qpair *qpair,
+			     unsigned char *key, size_t key_len,
+			     void *payload, uint64_t payload_size,
+			     spdk_nvme_cmd_cb cb_fn, void *cb_arg,
+			     uint8_t store_flags, uint32_t io_flags) {
+	return 0;
+}
+
+int
+spdk_nvme_ns_cmd_kvretrieve(struct spdk_nvme_ns *ns, struct spdk_nvme_qpair *qpair,
+				unsigned char *key, size_t key_len,
+				void *buffer, uint64_t buffer_size,
+				spdk_nvme_cmd_cb cb_fn, void *cb_arg,
+				uint64_t offset, uint32_t io_flags) {
+	return 0;
+}
+
+int
+spdk_nvme_ns_cmd_kvselect_send(struct spdk_nvme_ns *ns, struct spdk_nvme_qpair *qpair,
+				   unsigned char *key, size_t key_len, char *query,
+				   spdk_nvme_kv_datatype input_type, spdk_nvme_kv_datatype output_type,
+				   uint8_t header_opts, spdk_nvme_cmd_cb cb_fn, void *cb_arg,
+				   uint32_t io_flags) {
+	return 0;
+}
+
+
+int
+spdk_nvme_ns_cmd_kvselect_retrieve(struct spdk_nvme_ns *ns, struct spdk_nvme_qpair *qpair,
+				       uint32_t select_id, uint32_t offset, void *buffer,
+				       uint32_t buffer_size, spdk_nvme_kv_select_opts opts,
+				       spdk_nvme_cmd_cb cb_fn, void *cb_arg,
+				       uint32_t io_flags) {
+	return 0;
+}
+
 struct spdk_nvme_poll_group *
 spdk_nvme_poll_group_create(void *ctx, struct spdk_nvme_accel_fn_table *table)
 {

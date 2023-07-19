@@ -3,6 +3,7 @@
  *   Copyright (c) 2019 Mellanox Technologies LTD. All rights reserved.
  *   Copyright (c) 2021, 2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *   Copyright (c) 2022 Dell Inc, or its subsidiaries. All rights reserved.
+ *   Copyright (C) 2023 AirMettle, Inc. All rights reserved.
  */
 
 #include "spdk/stdinc.h"
@@ -16,6 +17,7 @@
 #include "spdk/json.h"
 #include "spdk/likely.h"
 #include "spdk/nvme.h"
+#include "spdk/nvme_kv.h"
 #include "spdk/nvme_ocssd.h"
 #include "spdk/nvme_zns.h"
 #include "spdk/opal.h"
@@ -192,6 +194,8 @@ static int nvme_ctrlr_read_ana_log_page(struct nvme_ctrlr *nvme_ctrlr);
 
 static struct nvme_ns *nvme_ns_alloc(void);
 static void nvme_ns_free(struct nvme_ns *ns);
+
+static void bdev_nvme_kv_done(void *ref, const struct spdk_nvme_cpl *cpl);
 
 static int
 nvme_ns_cmp(struct nvme_ns *ns1, struct nvme_ns *ns2)
@@ -2436,6 +2440,82 @@ _bdev_nvme_submit_request(struct nvme_bdev_channel *nbdev_ch, struct spdk_bdev_i
 				    bdev_io->u.bdev.offset_blocks,
 				    bdev_io->u.bdev.copy.src_offset_blocks,
 				    bdev_io->u.bdev.num_blocks);
+		break;
+	case SPDK_BDEV_IO_KV_LIST:
+		nbdev_io->iovs = bdev_io->u.bdev.iovs;
+		nbdev_io->iovcnt = bdev_io->u.bdev.iovcnt;
+		nbdev_io->iovpos = 0;
+		nbdev_io->iov_offset = 0;
+		rc = spdk_nvme_ns_cmd_kvlist(nbdev_io->io_path->nvme_ns->ns,
+						nbdev_io->io_path->qpair->qpair, bdev_io->u.nvme_kv.key,
+						bdev_io->u.nvme_kv.key_length, bdev_io->iov.iov_base,
+						bdev_io->iov.iov_len, bdev_nvme_kv_done,
+						nbdev_io, bdev->dif_check_flags);
+		break;
+	case SPDK_BDEV_IO_KV_DELETE:
+		nbdev_io->iovs = bdev_io->u.bdev.iovs;
+		nbdev_io->iovcnt = bdev_io->u.bdev.iovcnt;
+		nbdev_io->iovpos = 0;
+		nbdev_io->iov_offset = 0;
+		rc = spdk_nvme_ns_cmd_kvdelete(nbdev_io->io_path->nvme_ns->ns,
+						nbdev_io->io_path->qpair->qpair, bdev_io->u.nvme_kv.key,
+						bdev_io->u.nvme_kv.key_length, bdev_nvme_kv_done,
+						nbdev_io, bdev->dif_check_flags);
+		break;
+	case SPDK_BDEV_IO_KV_EXIST:
+		nbdev_io->iovs = bdev_io->u.bdev.iovs;
+		nbdev_io->iovcnt = bdev_io->u.bdev.iovcnt;
+		nbdev_io->iovpos = 0;
+		nbdev_io->iov_offset = 0;
+		rc = spdk_nvme_ns_cmd_kvexist(nbdev_io->io_path->nvme_ns->ns,
+						nbdev_io->io_path->qpair->qpair, bdev_io->u.nvme_kv.key,
+						bdev_io->u.nvme_kv.key_length, bdev_nvme_kv_done,
+						nbdev_io, bdev->dif_check_flags);
+		break;
+	case SPDK_BDEV_IO_KV_STORE:
+		nbdev_io->iovs = bdev_io->u.bdev.iovs;
+		nbdev_io->iovcnt = bdev_io->u.bdev.iovcnt;
+		nbdev_io->iovpos = 0;
+		nbdev_io->iov_offset = 0;
+		rc = spdk_nvme_ns_cmd_kvstore(nbdev_io->io_path->nvme_ns->ns,
+						nbdev_io->io_path->qpair->qpair, bdev_io->u.nvme_kv.key,
+						bdev_io->u.nvme_kv.key_length, bdev_io->iov.iov_base,
+						bdev_io->iov.iov_len, bdev_nvme_kv_done,
+						nbdev_io, bdev_io->u.nvme_kv.options, bdev->dif_check_flags);
+		break;
+	case SPDK_BDEV_IO_KV_RETRIEVE:
+		nbdev_io->iovs = bdev_io->u.bdev.iovs;
+		nbdev_io->iovcnt = bdev_io->u.bdev.iovcnt;
+		nbdev_io->iovpos = 0;
+		nbdev_io->iov_offset = 0;
+		rc = spdk_nvme_ns_cmd_kvretrieve(nbdev_io->io_path->nvme_ns->ns,
+						nbdev_io->io_path->qpair->qpair, bdev_io->u.nvme_kv.key,
+						bdev_io->u.nvme_kv.key_length, bdev_io->iov.iov_base,
+						bdev_io->iov.iov_len, bdev_nvme_kv_done,
+						nbdev_io, bdev_io->u.nvme_kv.offset, bdev->dif_check_flags);
+		break;
+	case SPDK_BDEV_IO_KV_SEND_SELECT:
+		nbdev_io->iovs = bdev_io->u.bdev.iovs;
+		nbdev_io->iovcnt = bdev_io->u.bdev.iovcnt;
+		nbdev_io->iovpos = 0;
+		nbdev_io->iov_offset = 0;
+		rc = spdk_nvme_ns_cmd_kvselect_send(nbdev_io->io_path->nvme_ns->ns,
+						nbdev_io->io_path->qpair->qpair, bdev_io->u.nvme_kv.key,
+						bdev_io->u.nvme_kv.key_length, bdev_io->iov.iov_base,
+						bdev_io->u.nvme_kv.select_input_type, bdev_io->u.nvme_kv.select_output_type,
+						bdev_io->u.nvme_kv.options, bdev_nvme_kv_done, nbdev_io, bdev->dif_check_flags);
+		break;
+	case SPDK_BDEV_IO_KV_RETRIEVE_SELECT:
+		nbdev_io->iovs = bdev_io->u.bdev.iovs;
+		nbdev_io->iovcnt = bdev_io->u.bdev.iovcnt;
+		nbdev_io->iovpos = 0;
+		nbdev_io->iov_offset = 0;
+		rc = spdk_nvme_ns_cmd_kvselect_retrieve(nbdev_io->io_path->nvme_ns->ns,
+						nbdev_io->io_path->qpair->qpair,
+						bdev_io->u.nvme_kv.select_id, bdev_io->u.nvme_kv.offset,
+						bdev_io->iov.iov_base,	bdev_io->iov.iov_len,
+						bdev_io->u.nvme_kv.options, bdev_nvme_kv_done, nbdev_io,
+						bdev->dif_check_flags);
 		break;
 	default:
 		rc = -EINVAL;
@@ -6276,6 +6356,20 @@ static void
 bdev_nvme_queued_done(void *ref, const struct spdk_nvme_cpl *cpl)
 {
 	struct nvme_bdev_io *bio = ref;
+
+	bdev_nvme_io_complete_nvme_status(bio, cpl);
+}
+
+static void
+bdev_nvme_kv_done(void *ref, const struct spdk_nvme_cpl *cpl)
+{
+	struct nvme_bdev_io *bio = ref;
+
+	if (spdk_nvme_cpl_is_pi_error(cpl)) {
+		SPDK_ERRLOG("kv completed with PI error (sct=%d, sc=%d)\n",
+			    cpl->status.sct, cpl->status.sc);
+		bdev_nvme_verify_pi_error(bio);
+	}
 
 	bdev_nvme_io_complete_nvme_status(bio, cpl);
 }

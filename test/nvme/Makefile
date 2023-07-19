@@ -1,5 +1,6 @@
 #  SPDX-License-Identifier: BSD-3-Clause
 #  Copyright (C) 2015 Intel Corporation.
+#  Copyright (C) 2023 AirMettle, Inc.
 #  All rights reserved.
 #
 
@@ -8,7 +9,7 @@ include $(SPDK_ROOT_DIR)/mk/spdk.common.mk
 
 DIRS-y = aer reset sgl e2edp overhead err_injection \
 	startup reserve simple_copy connect_stress boot_partition \
-	compliance fused_ordering
+	compliance fused_ordering kv
 DIRS-$(CONFIG_NVME_CUSE) += cuse
 
 .PHONY: all clean $(DIRS-y)

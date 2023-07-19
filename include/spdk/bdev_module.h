@@ -2,6 +2,7 @@
  *   Copyright (C) 2016 Intel Corporation.
  *   All rights reserved.
  *   Copyright (c) 2021-2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ *   Copyright (C) 2023 AirMettle, Inc. All rights reserved.
  */
 
 /** \file
@@ -755,6 +756,15 @@ struct spdk_bdev_io {
 			/* meta data buffer size to transfer */
 			size_t md_len;
 		} nvme_passthru;
+		struct {
+                        unsigned char key[NVME_KV_MAX_KEY_LENGTH];
+                        size_t key_length;
+                        uint32_t select_id;
+                        uint8_t options;
+                        uint8_t select_input_type;
+                        uint8_t select_output_type;
+                        uint32_t offset;
+                } nvme_kv;
 		struct {
 			/* First logical block of a zone */
 			uint64_t zone_id;
