@@ -2075,7 +2075,7 @@ void spdk_bdev_for_each_channel(struct spdk_bdev *bdev, spdk_bdev_for_each_chann
 #define NVME_KV_STORE_CMD_OPTION_MUST_NOT_EXIST 0x02
 #define NVME_KV_STORE_CMD_OPTION_NOT_COMPRESS 0x04
 #define NVME_KV_STORE_CMD_OPTION_APPEND 0x08
-#define NVME_KV_SELECT_CMD_OPTION_DO_NOT_FREE 0x02
+#define NVME_KV_SELECT_CMD_OPTION_DO_NOT_FREE 0x01
 #define NVME_KV_SELECT_CMD_OPTION_DO_NOT_FREE_IF_NOT_ALL_DATA_FETCHED 0x02
 #define NVME_KV_SELECT_CMD_OUTPUT_TYPE_USE_CSV_HEADERS_INPUT 0x01
 #define NVME_KV_SELECT_CMD_OUTPUT_TYPE_USE_CSV_HEADERS_OUTPUT 0x02
@@ -2087,6 +2087,11 @@ int spdk_bdev_kv_list(struct spdk_bdev_desc *desc, struct spdk_io_channel *ch,
                    unsigned char *key, size_t key_length,
 		   void *buf, uint64_t nbytes,
 		   spdk_bdev_io_completion_cb cb, void *cb_arg);
+
+int spdk_bdev_kv_listv(struct spdk_bdev_desc *desc, struct spdk_io_channel *ch,
+                   unsigned char *key, size_t key_length,
+                   struct iovec *iov, int iovcnt, uint64_t nbytes,
+                   spdk_bdev_io_completion_cb cb, void *cb_arg);
 
 int spdk_bdev_kv_exist(struct spdk_bdev_desc *desc, struct spdk_io_channel *ch,
                    unsigned char *key, size_t key_length,
@@ -2101,9 +2106,19 @@ int spdk_bdev_kv_store(struct spdk_bdev_desc *desc, struct spdk_io_channel *ch,
                    void *buf, uint64_t nbytes, uint8_t options,
                    spdk_bdev_io_completion_cb cb, void *cb_arg);
 
+int spdk_bdev_kv_storev(struct spdk_bdev_desc *desc, struct spdk_io_channel *ch,
+                   unsigned char *key, size_t key_length,
+                   struct iovec *iov, int iovcnt, uint64_t nbytes, uint8_t options,
+                   spdk_bdev_io_completion_cb cb, void *cb_arg);
+
 int spdk_bdev_kv_retrieve(struct spdk_bdev_desc *desc, struct spdk_io_channel *ch,
                    unsigned char *key, size_t key_length,
-		   void *buf, uint64_t offset, uint64_t nbytes,
+                   void *buf, uint64_t offset, uint64_t nbytes,
+                   spdk_bdev_io_completion_cb cb, void *cb_arg);
+
+int spdk_bdev_kv_retrievev(struct spdk_bdev_desc *desc, struct spdk_io_channel *ch,
+                   unsigned char *key, size_t key_length,
+                   struct iovec *iov, int iovcnt, uint64_t offset, uint64_t nbytes,
                    spdk_bdev_io_completion_cb cb, void *cb_arg);
 
 int spdk_bdev_kv_send_select(struct spdk_bdev_desc *desc, struct spdk_io_channel *ch,
@@ -2112,8 +2127,19 @@ int spdk_bdev_kv_send_select(struct spdk_bdev_desc *desc, struct spdk_io_channel
                    uint8_t input_type, uint8_t output_type,
                    spdk_bdev_io_completion_cb cb, void *cb_arg);
 
+int spdk_bdev_kv_send_selectv(struct spdk_bdev_desc *desc, struct spdk_io_channel *ch,
+                   unsigned char *key, size_t key_length,
+                   struct iovec *iov, int iovcnt, uint64_t nbytes, uint8_t options,
+                   uint8_t input_type, uint8_t output_type,
+                   spdk_bdev_io_completion_cb cb, void *cb_arg);
+
 int spdk_bdev_kv_retrieve_select(struct spdk_bdev_desc *desc, struct spdk_io_channel *ch,
-		   void *buf, uint64_t offset, uint64_t nbytes,
+                   void *buf, uint64_t offset, uint64_t nbytes,
+                   uint32_t select_id, uint8_t options,
+                   spdk_bdev_io_completion_cb cb, void *cb_arg);
+
+int spdk_bdev_kv_retrieve_selectv(struct spdk_bdev_desc *desc, struct spdk_io_channel *ch,
+                   struct iovec *iov, int iovcnt, uint64_t offset, uint64_t nbytes,
                    uint32_t select_id, uint8_t options,
                    spdk_bdev_io_completion_cb cb, void *cb_arg);
 

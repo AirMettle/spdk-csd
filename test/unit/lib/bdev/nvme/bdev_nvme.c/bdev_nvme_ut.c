@@ -1102,6 +1102,15 @@ spdk_nvme_ns_cmd_kvlist(struct spdk_nvme_ns *ns, struct spdk_nvme_qpair *qpair,
 	return 0;
 }
 
+int 
+spdk_nvme_ns_cmd_kvlistv(struct spdk_nvme_ns *ns, struct spdk_nvme_qpair *qpair,
+			unsigned char *prefix, size_t prefix_len, uint64_t buffer_size,
+			spdk_nvme_cmd_cb cb_fn, void *cb_arg, uint32_t io_flags,
+			spdk_nvme_req_reset_sgl_cb reset_sgl_fn,
+			spdk_nvme_req_next_sge_cb next_sge_fn) {
+		return 0;
+}
+
 int
 spdk_nvme_ns_cmd_kvdelete(struct spdk_nvme_ns *ns, struct spdk_nvme_qpair *qpair,
 			  unsigned char *key, size_t key_len,
@@ -1128,11 +1137,32 @@ spdk_nvme_ns_cmd_kvstore(struct spdk_nvme_ns *ns, struct spdk_nvme_qpair *qpair,
 }
 
 int
+spdk_nvme_ns_cmd_kvstorev(struct spdk_nvme_ns *ns, struct spdk_nvme_qpair *qpair,
+					unsigned char *key, size_t key_len,
+					uint64_t buffer_size,
+					spdk_nvme_cmd_cb cb_fn, void *cb_arg,
+			    uint8_t store_flags, uint32_t io_flags,
+			    spdk_nvme_req_reset_sgl_cb reset_sgl_fn,
+			    spdk_nvme_req_next_sge_cb next_sge_fn) {
+	return 0;
+}
+
+int
 spdk_nvme_ns_cmd_kvretrieve(struct spdk_nvme_ns *ns, struct spdk_nvme_qpair *qpair,
 				unsigned char *key, size_t key_len,
 				void *buffer, uint64_t buffer_size,
 				spdk_nvme_cmd_cb cb_fn, void *cb_arg,
 				uint64_t offset, uint32_t io_flags) {
+	return 0;
+}
+
+int
+spdk_nvme_ns_cmd_kvretrievev(struct spdk_nvme_ns *ns, struct spdk_nvme_qpair *qpair,
+			    unsigned char *key, size_t key_len, uint64_t buffer_size,
+			    spdk_nvme_cmd_cb cb_fn, void *cb_arg,
+					uint64_t offset, uint32_t io_flags,
+					spdk_nvme_req_reset_sgl_cb reset_sgl_fn,
+			    spdk_nvme_req_next_sge_cb next_sge_fn)  {
 	return 0;
 }
 
@@ -1145,6 +1175,15 @@ spdk_nvme_ns_cmd_kvselect_send(struct spdk_nvme_ns *ns, struct spdk_nvme_qpair *
 	return 0;
 }
 
+int
+spdk_nvme_ns_cmd_kvselect_sendv(struct spdk_nvme_ns *ns, struct spdk_nvme_qpair *qpair,
+				   unsigned char *key, size_t key_len, uint64_t query_len,
+				   spdk_nvme_kv_datatype input_type, spdk_nvme_kv_datatype output_type,
+				   uint8_t header_opts, spdk_nvme_cmd_cb cb_fn, void *cb_arg,
+				   uint32_t io_flags, spdk_nvme_req_reset_sgl_cb reset_sgl_fn,
+			     spdk_nvme_req_next_sge_cb next_sge_fn) {
+	return 0;
+}
 
 int
 spdk_nvme_ns_cmd_kvselect_retrieve(struct spdk_nvme_ns *ns, struct spdk_nvme_qpair *qpair,
@@ -1152,6 +1191,15 @@ spdk_nvme_ns_cmd_kvselect_retrieve(struct spdk_nvme_ns *ns, struct spdk_nvme_qpa
 				       uint32_t buffer_size, spdk_nvme_kv_select_opts opts,
 				       spdk_nvme_cmd_cb cb_fn, void *cb_arg,
 				       uint32_t io_flags) {
+	return 0;
+}
+
+int spdk_nvme_ns_cmd_kvselect_retrievev(struct spdk_nvme_ns *ns, struct spdk_nvme_qpair *qpair,
+				       uint32_t select_id, uint32_t offset,
+				       uint32_t buffer_size, spdk_nvme_kv_select_opts opts,
+				       spdk_nvme_cmd_cb cb_fn, void *cb_arg,
+				       uint32_t io_flags, spdk_nvme_req_reset_sgl_cb reset_sgl_fn,
+				       spdk_nvme_req_next_sge_cb next_sge_fn) {
 	return 0;
 }
 

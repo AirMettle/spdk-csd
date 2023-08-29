@@ -26,14 +26,14 @@ extern "C" {
 enum NVME_KV_Opcodes {
     /* KV commands - these don't exactly match 2.0 spec since we can't use 0x01 and 0x02 */
     /* write commands need 0x01 set */
-    /* read commands need 0x01 set */
+    /* read commands need 0x02 set */
     SPDK_NVME_OPC_KV_LIST            = 0x06,
     SPDK_NVME_OPC_KV_DELETE          = 0x10,
     SPDK_NVME_OPC_KV_EXIST           = 0x14,
     SPDK_NVME_OPC_KV_STORE           = 0x81,
     SPDK_NVME_OPC_KV_RETRIEVE        = 0x82,
     /* Send the select command */
-    SPDK_NVME_OPC_KV_SEND_SELECT     = 0x83,
+    SPDK_NVME_OPC_KV_SEND_SELECT     = 0x85,
     /* Retrieve results from the select */
     SPDK_NVME_OPC_KV_RETRIEVE_SELECT = 0x86
 };
@@ -65,6 +65,12 @@ int spdk_nvme_ns_cmd_kvlist(struct spdk_nvme_ns *ns, struct spdk_nvme_qpair *qpa
 			    unsigned char *prefix, size_t prefix_len,
 			    void *buffer, uint64_t buffer_size,
 			    spdk_nvme_cmd_cb cb_fn, void *cb_arg, uint32_t io_flags);
+
+int spdk_nvme_ns_cmd_kvlistv(struct spdk_nvme_ns *ns, struct spdk_nvme_qpair *qpair,
+			    unsigned char *prefix, size_t prefix_len,	uint64_t buffer_size,
+			    spdk_nvme_cmd_cb cb_fn, void *cb_arg, uint32_t io_flags,
+			    spdk_nvme_req_reset_sgl_cb reset_sgl_fn,
+			    spdk_nvme_req_next_sge_cb next_sge_fn);
 
 /**
  * Deletes a key-value pair.
@@ -160,6 +166,14 @@ int spdk_nvme_ns_cmd_kvstore(struct spdk_nvme_ns *ns, struct spdk_nvme_qpair *qp
 			     spdk_nvme_cmd_cb cb_fn, void *cb_arg,
 			     uint8_t store_flags, uint32_t io_flags);
 
+int spdk_nvme_ns_cmd_kvstorev(struct spdk_nvme_ns *ns, struct spdk_nvme_qpair *qpair,
+					unsigned char *key, size_t key_len,
+					uint64_t payload_size,
+					spdk_nvme_cmd_cb cb_fn, void *cb_arg,
+					uint8_t store_flags, uint32_t io_flags,
+					spdk_nvme_req_reset_sgl_cb reset_sgl_fn,
+					spdk_nvme_req_next_sge_cb next_sge_fn);
+
 /**
  * Retrieves the data blob associated with the given key.
  *
@@ -188,6 +202,14 @@ int spdk_nvme_ns_cmd_kvretrieve(struct spdk_nvme_ns *ns, struct spdk_nvme_qpair 
 				void *buffer, uint64_t buffer_size,
 				spdk_nvme_cmd_cb cb_fn, void *cb_arg,
 				uint64_t offset, uint32_t io_flags);
+
+int spdk_nvme_ns_cmd_kvretrievev(struct spdk_nvme_ns *ns, struct spdk_nvme_qpair *qpair,
+				unsigned char *key, size_t key_len,
+				uint64_t buffer_size,
+				spdk_nvme_cmd_cb cb_fn, void *cb_arg,
+				uint64_t offset, uint32_t io_flags,
+				spdk_nvme_req_reset_sgl_cb reset_sgl_fn,
+				spdk_nvme_req_next_sge_cb next_sge_fn);
 
 
 /*
@@ -233,6 +255,13 @@ int spdk_nvme_ns_cmd_kvselect_send(struct spdk_nvme_ns *ns, struct spdk_nvme_qpa
 				   uint8_t header_opts, spdk_nvme_cmd_cb cb_fn, void *cb_arg,
 				   uint32_t io_flags);
 
+int spdk_nvme_ns_cmd_kvselect_sendv(struct spdk_nvme_ns *ns, struct spdk_nvme_qpair *qpair,
+				   unsigned char *key, size_t key_len, uint64_t query_len,
+				   spdk_nvme_kv_datatype input_type, spdk_nvme_kv_datatype output_type,
+				   uint8_t header_opts, spdk_nvme_cmd_cb cb_fn, void *cb_arg,
+				   uint32_t io_flags, spdk_nvme_req_reset_sgl_cb reset_sgl_fn,
+				   spdk_nvme_req_next_sge_cb next_sge_fn);
+
 /* Options on retrieving selection */
 typedef enum {
 	SPDK_NVME_KV_SELECT_FREE_ALL 	= 0,
@@ -267,6 +296,13 @@ int spdk_nvme_ns_cmd_kvselect_retrieve(struct spdk_nvme_ns *ns, struct spdk_nvme
 				       uint32_t buffer_size, spdk_nvme_kv_select_opts opts,
 				       spdk_nvme_cmd_cb cb_fn, void *cb_arg,
 				       uint32_t io_flags);
+
+int spdk_nvme_ns_cmd_kvselect_retrievev(struct spdk_nvme_ns *ns, struct spdk_nvme_qpair *qpair,
+				       uint32_t select_id, uint32_t offset,
+				       uint32_t buffer_size, spdk_nvme_kv_select_opts opts,
+				       spdk_nvme_cmd_cb cb_fn, void *cb_arg,
+				       uint32_t io_flags, spdk_nvme_req_reset_sgl_cb reset_sgl_fn,
+				       spdk_nvme_req_next_sge_cb next_sge_fn);
 
 #ifdef __cplusplus
 }

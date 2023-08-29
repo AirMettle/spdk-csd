@@ -9,7 +9,7 @@ include $(SPDK_ROOT_DIR)/mk/spdk.common.mk
 
 DIRS-y = aer reset sgl e2edp overhead err_injection \
 	startup reserve simple_copy connect_stress boot_partition \
-	compliance fused_ordering kv
+	compliance fused_ordering kv kv_sgl
 DIRS-$(CONFIG_NVME_CUSE) += cuse
 
 .PHONY: all clean $(DIRS-y)

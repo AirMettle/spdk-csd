@@ -19,13 +19,10 @@ static struct nvme_request *g_request = NULL;
  * Mock code from QEMU implemenation to verify _nvme_cmd_kv_add_key()
  */
 
-/* shortcut to use local endian.h as replacement for qemu defines */
-#define le32_to_cpu(x)  from_le32(&x)
-
 /* Copied from nvme-kv qemu implementation */
 
-#define NVM_KV_GET_STORE_CMD_OPTIONS(dw) ((le32_to_cpu(dw) >> 8) & 0xff)
-#define NVM_KV_GET_KEY_LENGTH(dw) (le32_to_cpu(dw) & 0xff)
+#define NVM_KV_GET_STORE_CMD_OPTIONS(dw) (dw >> 8) & 0xff)
+#define NVM_KV_GET_KEY_LENGTH(dw) (dw & 0xff)
 
 typedef struct __attribute__((packed)) NvmeSglDescriptor {
     uint64_t addr;
@@ -70,10 +67,10 @@ static int nvme_kv_get_key(NvmeKvCmd *cmd, unsigned char *key_buf, size_t *key_l
 
    uint32_t words[4];
 
-   words[0] = le32_to_cpu(cmd->key_word_4);
-   words[1] = le32_to_cpu(cmd->key_word_3);
-   words[2] = le32_to_cpu(cmd->key_word_2);
-   words[3] = le32_to_cpu(cmd->key_word_1);
+   words[0] = cmd->key_word_4;
+   words[1] = cmd->key_word_3;
+   words[2] = cmd->key_word_2;
+   words[3] = cmd->key_word_1;
 
    unsigned char *p = key_buf;
    size_t len = kv_length;

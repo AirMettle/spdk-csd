@@ -41,6 +41,7 @@ struct hello_context {
 	uint32_t buff_size;
 	char *bdev_name;
 	struct spdk_bdev_io_wait_entry bdev_io_wait;
+        struct iovec *iovs;
 };
 
 /*
@@ -170,6 +171,7 @@ hello_start(void *arg1)
 				   spdk_bdev_get_write_unit_size(hello_context->bdev);
 	buf_align = spdk_bdev_get_buf_align(hello_context->bdev);
 	hello_context->buff = spdk_dma_zmalloc(hello_context->buff_size, buf_align, NULL);
+	hello_context->iovs = malloc(sizeof(struct iovec) * 2);
 	if (!hello_context->buff) {
 		SPDK_ERRLOG("Failed to allocate buffer\n");
 		spdk_put_io_channel(hello_context->bdev_io_channel);
@@ -226,6 +228,7 @@ main(int argc, char **argv)
 
 	/* When the app stops, free up memory that we allocated. */
 	spdk_dma_free(hello_context.buff);
+        free(hello_context.iovs);
 
 	/* Gracefully close out all of the SPDK subsystems. */
 	spdk_app_fini();
@@ -406,10 +409,15 @@ hello_kv_list(void *arg) {
         struct hello_context *hello_context = arg;
         int rc = 0;
 
+        hello_context->iovs[0].iov_base = hello_context->buff;
+        hello_context->iovs[0].iov_len = 6;
+        hello_context->iovs[1].iov_base = hello_context->buff + 6;
+        hello_context->iovs[1].iov_len = hello_context->buff_size - 6;
+
         SPDK_NOTICELOG("Calling kv list\n");
-        rc = spdk_bdev_kv_list(hello_context->bdev_desc, hello_context->bdev_io_channel,
+        rc = spdk_bdev_kv_listv(hello_context->bdev_desc, hello_context->bdev_io_channel,
                              "", 0,
-			     hello_context->buff, hello_context->buff_size,
+			     hello_context->iovs, 2, hello_context->buff_size,
                              kv_list_complete, hello_context);
 
         if (rc == -ENOMEM) {
@@ -457,12 +465,17 @@ static void
 hello_kv_send_select(void *arg) {
         struct hello_context *hello_context = arg;
         int rc = 0;
-
 	snprintf(hello_context->buff, hello_context->buff_size, "%s", "select * from x where a=1");
+
+        hello_context->iovs[0].iov_base = hello_context->buff;
+        hello_context->iovs[0].iov_len = 6;
+        hello_context->iovs[1].iov_base = hello_context->buff + 6;
+        hello_context->iovs[1].iov_len = strlen(hello_context->buff) + 1 - 6;
+
         SPDK_NOTICELOG("Calling kv send select\n");
-        rc = spdk_bdev_kv_send_select(hello_context->bdev_desc, hello_context->bdev_io_channel,
+        rc = spdk_bdev_kv_send_selectv(hello_context->bdev_desc, hello_context->bdev_io_channel,
                              test_key, test_key_length,
-			     hello_context->buff, hello_context->buff_size,
+			     hello_context->iovs, 2, strlen(hello_context->buff),
                              NVME_KV_SELECT_CMD_OUTPUT_TYPE_USE_CSV_HEADERS_INPUT,
                              NVME_KV_SELECT_TYPE_CSV, NVME_KV_SELECT_TYPE_CSV,
                              kv_send_select_complete, hello_context);
@@ -508,9 +521,14 @@ hello_kv_retrieve_select(void *arg) {
         struct hello_context *hello_context = arg;
         int rc = 0;
 
+        hello_context->iovs[0].iov_base = hello_context->buff;
+        hello_context->iovs[0].iov_len = 3;
+        hello_context->iovs[1].iov_base = hello_context->buff + 3;
+        hello_context->iovs[1].iov_len = hello_context->buff_size - 3;
+
         SPDK_NOTICELOG("Calling kv retrieve select\n");
-        rc = spdk_bdev_kv_retrieve_select(hello_context->bdev_desc, hello_context->bdev_io_channel,
-                             hello_context->buff, 0, hello_context->buff_size,
+        rc = spdk_bdev_kv_retrieve_selectv(hello_context->bdev_desc, hello_context->bdev_io_channel,
+                             hello_context->iovs, 2, 0, hello_context->buff_size,
                              select_id, 0,
                              kv_retrieve_select_complete, hello_context);
 
@@ -558,10 +576,15 @@ hello_kv_retrieve(void *arg)
         struct hello_context *hello_context = arg;
         int rc = 0;
 
+        hello_context->iovs[0].iov_base = hello_context->buff;
+        hello_context->iovs[0].iov_len = 6;
+        hello_context->iovs[1].iov_base = hello_context->buff + 6;
+        hello_context->iovs[1].iov_len = hello_context->buff_size - 6;
+
         SPDK_NOTICELOG("Calling kv retrieve\n");
-        rc = spdk_bdev_kv_retrieve(hello_context->bdev_desc, hello_context->bdev_io_channel,
+        rc = spdk_bdev_kv_retrievev(hello_context->bdev_desc, hello_context->bdev_io_channel,
                             test_key, test_key_length,
-                            hello_context->buff, 0, hello_context->buff_size, kv_retrieve_complete,
+                            hello_context->iovs, 2, 0, hello_context->buff_size, kv_retrieve_complete,
                             hello_context);
 
         if (rc == -ENOMEM) {
@@ -607,10 +630,15 @@ hello_kv_store(void *arg)
         struct hello_context *hello_context = arg;
         int rc = 0;
 
+        hello_context->iovs[0].iov_base = hello_context->buff;
+        hello_context->iovs[0].iov_len = 6;
+        hello_context->iovs[1].iov_base = hello_context->buff + 6;
+        hello_context->iovs[1].iov_len = strlen(hello_context->buff) - 6;
+
         SPDK_NOTICELOG("Calling kv store\n");
-        rc = spdk_bdev_kv_store(hello_context->bdev_desc, hello_context->bdev_io_channel,
+        rc = spdk_bdev_kv_storev(hello_context->bdev_desc, hello_context->bdev_io_channel,
                              test_key, test_key_length,
-                             hello_context->buff, strlen(hello_context->buff), 0, kv_store_complete,
+                             hello_context->iovs, 2, strlen(hello_context->buff), 0, kv_store_complete,
                              hello_context);
 
         if (rc == -ENOMEM) {

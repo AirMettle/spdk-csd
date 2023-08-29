@@ -18,7 +18,7 @@ static char *g_bdev_name = "Malloc0";
  * We'll use this struct to gather housekeeping hello_context to pass between
  * our events and callbacks.
  */
-struct hello_context_t {
+struct hello_context {
 	struct spdk_bdev *bdev;
 	struct spdk_bdev_desc *bdev_desc;
 	struct spdk_io_channel *bdev_io_channel;
@@ -59,7 +59,7 @@ hello_bdev_parse_arg(int ch, char *arg)
 static void
 read_complete(struct spdk_bdev_io *bdev_io, bool success, void *cb_arg)
 {
-	struct hello_context_t *hello_context = cb_arg;
+	struct hello_context *hello_context = cb_arg;
 
 	if (success) {
 		SPDK_NOTICELOG("Read string from bdev : %s\n", hello_context->buff);
@@ -78,7 +78,7 @@ read_complete(struct spdk_bdev_io *bdev_io, bool success, void *cb_arg)
 static void
 hello_read(void *arg)
 {
-	struct hello_context_t *hello_context = arg;
+	struct hello_context *hello_context = arg;
 	int rc = 0;
 
 	SPDK_NOTICELOG("Reading io\n");
@@ -108,7 +108,7 @@ hello_read(void *arg)
 static void
 write_complete(struct spdk_bdev_io *bdev_io, bool success, void *cb_arg)
 {
-	struct hello_context_t *hello_context = cb_arg;
+	struct hello_context *hello_context = cb_arg;
 
 	/* Complete the I/O */
 	spdk_bdev_free_io(bdev_io);
@@ -132,7 +132,7 @@ write_complete(struct spdk_bdev_io *bdev_io, bool success, void *cb_arg)
 static void
 hello_write(void *arg)
 {
-	struct hello_context_t *hello_context = arg;
+	struct hello_context *hello_context = arg;
 	int rc = 0;
 
 	SPDK_NOTICELOG("Writing to the bdev\n");
@@ -166,7 +166,7 @@ hello_bdev_event_cb(enum spdk_bdev_event_type type, struct spdk_bdev *bdev,
 static void
 reset_zone_complete(struct spdk_bdev_io *bdev_io, bool success, void *cb_arg)
 {
-	struct hello_context_t *hello_context = cb_arg;
+	struct hello_context *hello_context = cb_arg;
 
 	/* Complete the I/O */
 	spdk_bdev_free_io(bdev_io);
@@ -185,7 +185,7 @@ reset_zone_complete(struct spdk_bdev_io *bdev_io, bool success, void *cb_arg)
 static void
 hello_reset_zone(void *arg)
 {
-	struct hello_context_t *hello_context = arg;
+	struct hello_context *hello_context = arg;
 	int rc = 0;
 
 	rc = spdk_bdev_zone_management(hello_context->bdev_desc, hello_context->bdev_io_channel,
@@ -213,7 +213,7 @@ hello_reset_zone(void *arg)
 static void
 hello_start(void *arg1)
 {
-	struct hello_context_t *hello_context = arg1;
+	struct hello_context *hello_context = arg1;
 	uint32_t buf_align;
 	int rc = 0;
 	hello_context->bdev = NULL;
@@ -281,7 +281,7 @@ main(int argc, char **argv)
 {
 	struct spdk_app_opts opts = {};
 	int rc = 0;
-	struct hello_context_t hello_context = {};
+	struct hello_context hello_context = {};
 
 	/* Set default values in opts structure. */
 	spdk_app_opts_init(&opts, sizeof(opts));

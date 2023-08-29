@@ -2314,6 +2314,12 @@ exit:
 	}
 }
 
+static void
+bdev_nvme_queued_reset_sgl(void *ref, uint32_t sgl_offset);
+
+static int
+bdev_nvme_queued_next_sge(void *ref, void **address, uint32_t *length);
+
 static inline void
 _bdev_nvme_submit_request(struct nvme_bdev_channel *nbdev_ch, struct spdk_bdev_io *bdev_io)
 {
@@ -2446,11 +2452,20 @@ _bdev_nvme_submit_request(struct nvme_bdev_channel *nbdev_ch, struct spdk_bdev_i
 		nbdev_io->iovcnt = bdev_io->u.bdev.iovcnt;
 		nbdev_io->iovpos = 0;
 		nbdev_io->iov_offset = 0;
-		rc = spdk_nvme_ns_cmd_kvlist(nbdev_io->io_path->nvme_ns->ns,
-						nbdev_io->io_path->qpair->qpair, bdev_io->u.nvme_kv.key,
-						bdev_io->u.nvme_kv.key_length, bdev_io->iov.iov_base,
-						bdev_io->iov.iov_len, bdev_nvme_kv_done,
-						nbdev_io, bdev->dif_check_flags);
+		if (bdev_io->u.bdev.iovcnt == 1) {
+			rc = spdk_nvme_ns_cmd_kvlist(nbdev_io->io_path->nvme_ns->ns,
+				nbdev_io->io_path->qpair->qpair, bdev_io->u.bdev.nvme_kv.key,
+				bdev_io->u.bdev.nvme_kv.key_length, bdev_io->u.bdev.iovs[0].iov_base,
+				bdev_io->u.bdev.iovs[0].iov_len, bdev_nvme_kv_done,
+				nbdev_io, bdev->dif_check_flags);
+		} else {
+			rc = spdk_nvme_ns_cmd_kvlistv(nbdev_io->io_path->nvme_ns->ns,
+				nbdev_io->io_path->qpair->qpair, bdev_io->u.bdev.nvme_kv.key,
+				bdev_io->u.bdev.nvme_kv.key_length,
+				bdev_io->u.bdev.nvme_kv.buffer_size, bdev_nvme_kv_done,
+				nbdev_io, bdev->dif_check_flags, bdev_nvme_queued_reset_sgl,
+				bdev_nvme_queued_next_sge);
+		}
 		break;
 	case SPDK_BDEV_IO_KV_DELETE:
 		nbdev_io->iovs = bdev_io->u.bdev.iovs;
@@ -2458,8 +2473,8 @@ _bdev_nvme_submit_request(struct nvme_bdev_channel *nbdev_ch, struct spdk_bdev_i
 		nbdev_io->iovpos = 0;
 		nbdev_io->iov_offset = 0;
 		rc = spdk_nvme_ns_cmd_kvdelete(nbdev_io->io_path->nvme_ns->ns,
-						nbdev_io->io_path->qpair->qpair, bdev_io->u.nvme_kv.key,
-						bdev_io->u.nvme_kv.key_length, bdev_nvme_kv_done,
+						nbdev_io->io_path->qpair->qpair, bdev_io->u.bdev.nvme_kv.key,
+						bdev_io->u.bdev.nvme_kv.key_length, bdev_nvme_kv_done,
 						nbdev_io, bdev->dif_check_flags);
 		break;
 	case SPDK_BDEV_IO_KV_EXIST:
@@ -2468,8 +2483,8 @@ _bdev_nvme_submit_request(struct nvme_bdev_channel *nbdev_ch, struct spdk_bdev_i
 		nbdev_io->iovpos = 0;
 		nbdev_io->iov_offset = 0;
 		rc = spdk_nvme_ns_cmd_kvexist(nbdev_io->io_path->nvme_ns->ns,
-						nbdev_io->io_path->qpair->qpair, bdev_io->u.nvme_kv.key,
-						bdev_io->u.nvme_kv.key_length, bdev_nvme_kv_done,
+						nbdev_io->io_path->qpair->qpair, bdev_io->u.bdev.nvme_kv.key,
+						bdev_io->u.bdev.nvme_kv.key_length, bdev_nvme_kv_done,
 						nbdev_io, bdev->dif_check_flags);
 		break;
 	case SPDK_BDEV_IO_KV_STORE:
@@ -2477,45 +2492,81 @@ _bdev_nvme_submit_request(struct nvme_bdev_channel *nbdev_ch, struct spdk_bdev_i
 		nbdev_io->iovcnt = bdev_io->u.bdev.iovcnt;
 		nbdev_io->iovpos = 0;
 		nbdev_io->iov_offset = 0;
-		rc = spdk_nvme_ns_cmd_kvstore(nbdev_io->io_path->nvme_ns->ns,
-						nbdev_io->io_path->qpair->qpair, bdev_io->u.nvme_kv.key,
-						bdev_io->u.nvme_kv.key_length, bdev_io->iov.iov_base,
-						bdev_io->iov.iov_len, bdev_nvme_kv_done,
-						nbdev_io, bdev_io->u.nvme_kv.options, bdev->dif_check_flags);
+		if (bdev_io->u.bdev.iovcnt == 1) {
+			rc = spdk_nvme_ns_cmd_kvstore(nbdev_io->io_path->nvme_ns->ns,
+							nbdev_io->io_path->qpair->qpair, bdev_io->u.bdev.nvme_kv.key,
+							bdev_io->u.bdev.nvme_kv.key_length, bdev_io->u.bdev.iovs[0].iov_base,
+							bdev_io->u.bdev.iovs[0].iov_len, bdev_nvme_kv_done,
+							nbdev_io, bdev_io->u.bdev.nvme_kv.options, bdev->dif_check_flags);
+		} else {
+			rc = spdk_nvme_ns_cmd_kvstorev(nbdev_io->io_path->nvme_ns->ns,
+				nbdev_io->io_path->qpair->qpair, bdev_io->u.bdev.nvme_kv.key,
+				bdev_io->u.bdev.nvme_kv.key_length, bdev_io->u.bdev.nvme_kv.buffer_size, bdev_nvme_kv_done,
+				nbdev_io, bdev_io->u.bdev.nvme_kv.options, bdev->dif_check_flags,
+				bdev_nvme_queued_reset_sgl, bdev_nvme_queued_next_sge);
+		}
 		break;
 	case SPDK_BDEV_IO_KV_RETRIEVE:
 		nbdev_io->iovs = bdev_io->u.bdev.iovs;
 		nbdev_io->iovcnt = bdev_io->u.bdev.iovcnt;
 		nbdev_io->iovpos = 0;
 		nbdev_io->iov_offset = 0;
-		rc = spdk_nvme_ns_cmd_kvretrieve(nbdev_io->io_path->nvme_ns->ns,
-						nbdev_io->io_path->qpair->qpair, bdev_io->u.nvme_kv.key,
-						bdev_io->u.nvme_kv.key_length, bdev_io->iov.iov_base,
-						bdev_io->iov.iov_len, bdev_nvme_kv_done,
-						nbdev_io, bdev_io->u.nvme_kv.offset, bdev->dif_check_flags);
+		if (bdev_io->u.bdev.iovcnt == 1) {
+			rc = spdk_nvme_ns_cmd_kvretrieve(nbdev_io->io_path->nvme_ns->ns,
+							nbdev_io->io_path->qpair->qpair, bdev_io->u.bdev.nvme_kv.key,
+							bdev_io->u.bdev.nvme_kv.key_length, bdev_io->u.bdev.iovs[0].iov_base,
+							bdev_io->u.bdev.iovs[0].iov_len, bdev_nvme_kv_done,
+							nbdev_io, bdev_io->u.bdev.nvme_kv.offset, bdev->dif_check_flags);
+		} else {
+			rc = spdk_nvme_ns_cmd_kvretrievev(nbdev_io->io_path->nvme_ns->ns,
+				nbdev_io->io_path->qpair->qpair, bdev_io->u.bdev.nvme_kv.key,
+				bdev_io->u.bdev.nvme_kv.key_length,
+				bdev_io->u.bdev.nvme_kv.buffer_size, bdev_nvme_kv_done,
+				nbdev_io, bdev_io->u.bdev.nvme_kv.offset, bdev->dif_check_flags,
+				bdev_nvme_queued_reset_sgl, bdev_nvme_queued_next_sge);
+		}
 		break;
 	case SPDK_BDEV_IO_KV_SEND_SELECT:
 		nbdev_io->iovs = bdev_io->u.bdev.iovs;
 		nbdev_io->iovcnt = bdev_io->u.bdev.iovcnt;
 		nbdev_io->iovpos = 0;
 		nbdev_io->iov_offset = 0;
-		rc = spdk_nvme_ns_cmd_kvselect_send(nbdev_io->io_path->nvme_ns->ns,
-						nbdev_io->io_path->qpair->qpair, bdev_io->u.nvme_kv.key,
-						bdev_io->u.nvme_kv.key_length, bdev_io->iov.iov_base,
-						bdev_io->u.nvme_kv.select_input_type, bdev_io->u.nvme_kv.select_output_type,
-						bdev_io->u.nvme_kv.options, bdev_nvme_kv_done, nbdev_io, bdev->dif_check_flags);
+		if (bdev_io->u.bdev.iovcnt == 1) {
+			rc = spdk_nvme_ns_cmd_kvselect_send(nbdev_io->io_path->nvme_ns->ns,
+							nbdev_io->io_path->qpair->qpair, bdev_io->u.bdev.nvme_kv.key,
+							bdev_io->u.bdev.nvme_kv.key_length, bdev_io->u.bdev.iovs[0].iov_base,
+							bdev_io->u.bdev.nvme_kv.select_input_type, bdev_io->u.bdev.nvme_kv.select_output_type,
+							bdev_io->u.bdev.nvme_kv.options, bdev_nvme_kv_done, nbdev_io, bdev->dif_check_flags);
+		} else {
+			rc = spdk_nvme_ns_cmd_kvselect_sendv(nbdev_io->io_path->nvme_ns->ns,
+							nbdev_io->io_path->qpair->qpair, bdev_io->u.bdev.nvme_kv.key,
+							bdev_io->u.bdev.nvme_kv.key_length, bdev_io->u.bdev.nvme_kv.buffer_size,
+							bdev_io->u.bdev.nvme_kv.select_input_type, bdev_io->u.bdev.nvme_kv.select_output_type,
+							bdev_io->u.bdev.nvme_kv.options, bdev_nvme_kv_done, nbdev_io, bdev->dif_check_flags,
+							bdev_nvme_queued_reset_sgl, bdev_nvme_queued_next_sge);
+		}
 		break;
 	case SPDK_BDEV_IO_KV_RETRIEVE_SELECT:
 		nbdev_io->iovs = bdev_io->u.bdev.iovs;
 		nbdev_io->iovcnt = bdev_io->u.bdev.iovcnt;
 		nbdev_io->iovpos = 0;
 		nbdev_io->iov_offset = 0;
-		rc = spdk_nvme_ns_cmd_kvselect_retrieve(nbdev_io->io_path->nvme_ns->ns,
-						nbdev_io->io_path->qpair->qpair,
-						bdev_io->u.nvme_kv.select_id, bdev_io->u.nvme_kv.offset,
-						bdev_io->iov.iov_base,	bdev_io->iov.iov_len,
-						bdev_io->u.nvme_kv.options, bdev_nvme_kv_done, nbdev_io,
-						bdev->dif_check_flags);
+		if (bdev_io->u.bdev.iovcnt == 1) {
+			rc = spdk_nvme_ns_cmd_kvselect_retrieve(nbdev_io->io_path->nvme_ns->ns,
+							nbdev_io->io_path->qpair->qpair,
+							bdev_io->u.bdev.nvme_kv.select_id, bdev_io->u.bdev.nvme_kv.offset,
+							bdev_io->u.bdev.iovs[0].iov_base, bdev_io->u.bdev.iovs[0].iov_len,
+							bdev_io->u.bdev.nvme_kv.options, bdev_nvme_kv_done, nbdev_io,
+							bdev->dif_check_flags);
+		} else {
+			rc = spdk_nvme_ns_cmd_kvselect_retrievev(nbdev_io->io_path->nvme_ns->ns,
+							nbdev_io->io_path->qpair->qpair,
+							bdev_io->u.bdev.nvme_kv.select_id, bdev_io->u.bdev.nvme_kv.offset,
+							bdev_io->u.bdev.nvme_kv.buffer_size,
+							bdev_io->u.bdev.nvme_kv.options, bdev_nvme_kv_done, nbdev_io,
+							bdev->dif_check_flags, bdev_nvme_queued_reset_sgl,
+							bdev_nvme_queued_next_sge);
+		}
 		break;
 	default:
 		rc = -EINVAL;

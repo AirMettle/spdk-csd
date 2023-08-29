@@ -252,12 +252,17 @@
 
 	# public functions from nvme_kv.h
 	spdk_nvme_ns_cmd_kvlist;
+	spdk_nvme_ns_cmd_kvlistv;
 	spdk_nvme_ns_cmd_kvdelete;
 	spdk_nvme_ns_cmd_kvexist;
 	spdk_nvme_ns_cmd_kvstore;
+	spdk_nvme_ns_cmd_kvstorev;
 	spdk_nvme_ns_cmd_kvretrieve;
+	spdk_nvme_ns_cmd_kvretrievev;
 	spdk_nvme_ns_cmd_kvselect_send;
+	spdk_nvme_ns_cmd_kvselect_sendv;
 	spdk_nvme_ns_cmd_kvselect_retrieve;
+	spdk_nvme_ns_cmd_kvselect_retrievev;
 
 	local: *;
 };

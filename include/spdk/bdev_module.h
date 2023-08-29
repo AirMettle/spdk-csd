@@ -725,6 +725,17 @@ struct spdk_bdev_io {
 				/** Starting source offset (in blocks) of the bdev for copy I/O. */
 				uint64_t src_offset_blocks;
 			} copy;
+
+			struct {
+				unsigned char key[NVME_KV_MAX_KEY_LENGTH];
+				size_t key_length;
+				uint32_t select_id;
+				uint8_t options;
+				uint8_t select_input_type;
+				uint8_t select_output_type;
+				uint32_t offset;
+				uint32_t buffer_size;
+			} nvme_kv;
 		} bdev;
 		struct {
 			/** Channel reference held while messages for this reset are in progress. */
@@ -756,15 +767,6 @@ struct spdk_bdev_io {
 			/* meta data buffer size to transfer */
 			size_t md_len;
 		} nvme_passthru;
-		struct {
-                        unsigned char key[NVME_KV_MAX_KEY_LENGTH];
-                        size_t key_length;
-                        uint32_t select_id;
-                        uint8_t options;
-                        uint8_t select_input_type;
-                        uint8_t select_output_type;
-                        uint32_t offset;
-                } nvme_kv;
 		struct {
 			/* First logical block of a zone */
 			uint64_t zone_id;

@@ -111,18 +111,74 @@ attach_cb(void *cb_ctx, const struct spdk_nvme_transport_id *trid,
         }
 }
 
-struct base_ctx {
-	struct ns_entry		*ns_entry;
-	bool			cmd_done;
-	/* expected return values */
-	struct spdk_nvme_status	exp_status;
-
-	/* validation status */
-	int 			num_errors;
+struct sgl_element {
+	void *base;
+	size_t offset;
+	size_t len;
 };
 
+struct io_request {
+	uint32_t current_iov_index;
+	uint32_t current_iov_bytes_left;
+	struct sgl_element iovs[2];
+	uint32_t nseg;
+	bool cmd_done;
+	/* expected return values */
+	struct spdk_nvme_status exp_status;
+	/* validation status */
+	int num_errors;
+};
+
+static void
+nvme_request_reset_sgl(void *cb_arg, uint32_t sgl_offset)
+{
+	uint32_t i;
+	uint32_t offset = 0;
+	struct sgl_element *iov;
+	struct io_request *req = (struct io_request *)cb_arg;
+
+	for (i = 0; i < req->nseg; i++) {
+		iov = &req->iovs[i];
+		offset += iov->len;
+		if (offset > sgl_offset) {
+			break;
+		}
+	}
+	req->current_iov_index = i;
+	req->current_iov_bytes_left = offset - sgl_offset;
+	return;
+}
+
+static int
+nvme_request_next_sge(void *cb_arg, void **address, uint32_t *length)
+{
+	struct io_request *req = (struct io_request *)cb_arg;
+	struct sgl_element *iov;
+
+	if (req->current_iov_index >= req->nseg) {
+		*length = 0;
+		*address = NULL;
+		return 0;
+	}
+
+	iov = &req->iovs[req->current_iov_index];
+
+	if (req->current_iov_bytes_left) {
+		*address = iov->base + iov->offset + iov->len - req->current_iov_bytes_left;
+		*length = req->current_iov_bytes_left;
+		req->current_iov_bytes_left = 0;
+	} else {
+		*address = iov->base + iov->offset;
+		*length = iov->len;
+	}
+
+	req->current_iov_index++;
+
+	return 0;
+}
+
 static void basic_error_checking(void *arg, const struct spdk_nvme_cpl *cpl, char *cmd_name) {
-	struct base_ctx	*ctx = arg;
+	struct io_request	*ctx = arg;
 
 	ctx->cmd_done = 1;
 
@@ -148,9 +204,7 @@ static void basic_error_checking(void *arg, const struct spdk_nvme_cpl *cpl, cha
  */
 
 struct run_kvstore_ctx {
-	struct base_ctx			_base_ctx;
-	void			*buffer;
-	size_t			buffer_len;
+	struct io_request	_base_ctx;
 };
 
 static void
@@ -166,15 +220,17 @@ run_kvstore(struct ns_entry *ns_entry, char *key, size_t key_len, void *buffer, 
 
 	memset(&ctx, 0, sizeof(struct run_kvstore_ctx));
 
-	ctx._base_ctx.ns_entry = ns_entry;
 	ctx._base_ctx.cmd_done = 0;
-	ctx.buffer = buffer;
-	ctx.buffer_len = buffer_len;
+	ctx._base_ctx.iovs[0].base = buffer;
+	ctx._base_ctx.iovs[0].len = 6;
+	ctx._base_ctx.iovs[1].base = buffer + 6;
+	ctx._base_ctx.iovs[1].len = buffer_len - 6;
+	ctx._base_ctx.nseg = 2;
 	ctx._base_ctx.num_errors = 0;
 	ctx._base_ctx.exp_status.sc = sc;
 
-	rc = spdk_nvme_ns_cmd_kvstore(ns_entry->ns, ns_entry->qpair, key, key_len, ctx.buffer, ctx.buffer_len,
-				     run_kvstore_cb, &ctx, flags, 0);
+	rc = spdk_nvme_ns_cmd_kvstorev(ns_entry->ns, ns_entry->qpair, key, key_len, buffer_len,
+				     run_kvstore_cb, &ctx, flags, 0, nvme_request_reset_sgl, nvme_request_next_sge);
 	if (rc != 0) {
 		fprintf(stderr, "%s:%d: ERROR: spdk_nvme_ns_cmd_kvstore() returned error: %d\n", __FUNCTION__, __LINE__, rc);
 		return -1;
@@ -193,8 +249,8 @@ run_kvstore(struct ns_entry *ns_entry, char *key, size_t key_len, void *buffer, 
  */
 
 struct run_kvlist_ctx {
-	struct base_ctx			_base_ctx;
-	char			*buffer;
+	struct io_request	_base_ctx;
+	char 			*buffer;
 	size_t			buffer_len;
 
 	/* expected return values */
@@ -297,7 +353,6 @@ run_kvlist(struct ns_entry *ns_entry, char *key, size_t key_len, uint32_t exp_nu
 
 	memset(&ctx, 0, sizeof(struct run_kvlist_ctx));
 
-	ctx._base_ctx.ns_entry = ns_entry;
 	ctx._base_ctx.cmd_done = 0;
 	ctx._base_ctx.num_errors = 0;
 
@@ -309,10 +364,15 @@ run_kvlist(struct ns_entry *ns_entry, char *key, size_t key_len, uint32_t exp_nu
 	// create buffer
 	ctx.buffer_len = 16384;
 	ctx.buffer = spdk_zmalloc(ctx.buffer_len, g_block_size, NULL, SPDK_ENV_LCORE_ID_ANY, SPDK_MALLOC_DMA);
+	ctx._base_ctx.iovs[0].base = ctx.buffer;
+	ctx._base_ctx.iovs[0].len = 6;
+	ctx._base_ctx.iovs[1].base = ctx.buffer + 6;
+	ctx._base_ctx.iovs[1].len = ctx.buffer_len - 6;
+	ctx._base_ctx.nseg = 2;
 
-	rc = spdk_nvme_ns_cmd_kvlist(ns_entry->ns, ns_entry->qpair, key, key_len,
-				     ctx.buffer, ctx.buffer_len,
-				     run_kvlist_cb, &ctx, 0);
+	rc = spdk_nvme_ns_cmd_kvlistv(ns_entry->ns, ns_entry->qpair, key, key_len,
+				     ctx.buffer_len,
+				     run_kvlist_cb, &ctx, 0, nvme_request_reset_sgl, nvme_request_next_sge);
 	if (rc != 0) {
 		fprintf(stderr, "run_kvlist: ERROR: spdk_nvme_ns_cmd_kvlist() returned error: %d\n", rc);
 		spdk_free(ctx.buffer);
@@ -328,7 +388,7 @@ run_kvlist(struct ns_entry *ns_entry, char *key, size_t key_len, uint32_t exp_nu
 }
 
 struct run_kvexist_ctx {
-	struct base_ctx	_base_ctx;
+	struct io_request	_base_ctx;
 };
 
 /* Callback for verifying returned results */
@@ -366,7 +426,7 @@ run_kvexist(struct ns_entry *ns_entry, char *key, size_t key_len, uint16_t exp_s
 
 
 struct run_kvdelete_ctx {
-	struct base_ctx	_base_ctx;
+	struct io_request	_base_ctx;
 };
 
 /* Callback for verifying returned results */
@@ -404,7 +464,7 @@ run_kvdelete(struct ns_entry *ns_entry, char *key, size_t key_len, uint16_t exp_
 
 
 struct run_kvretrieve_ctx {
-	struct base_ctx	_base_ctx;
+	struct io_request	_base_ctx;
 	char 			*buffer;
 	size_t			buffer_len;
 	char			*expected_value;
@@ -444,7 +504,6 @@ run_kvretrieve(struct ns_entry *ns_entry, char *key, size_t key_len, uint16_t ex
 
 	memset(&ctx, 0, sizeof(struct run_kvretrieve_ctx));
 
-	ctx._base_ctx.ns_entry = ns_entry;
 	ctx._base_ctx.cmd_done = 0;
 	ctx._base_ctx.num_errors = 0;
 
@@ -456,11 +515,17 @@ run_kvretrieve(struct ns_entry *ns_entry, char *key, size_t key_len, uint16_t ex
 	ctx.buffer_len = 200;
 	ctx.buffer = spdk_zmalloc(ctx.buffer_len, g_block_size, NULL, SPDK_ENV_LCORE_ID_ANY, SPDK_MALLOC_DMA);
 
+	ctx._base_ctx.iovs[0].base = ctx.buffer;
+	ctx._base_ctx.iovs[0].len = 6;
+	ctx._base_ctx.iovs[1].base = ctx.buffer + 6;
+	ctx._base_ctx.iovs[1].len = ctx.buffer_len - 6;
+	ctx._base_ctx.nseg = 2;
+
 	for (size_t i = 0; i < expected_value_len; i += ctx.buffer_len) {
 		ctx.offset = i;
-		rc = spdk_nvme_ns_cmd_kvretrieve(ns_entry->ns, ns_entry->qpair, key, key_len,
-							ctx.buffer, ctx.buffer_len,
-							run_kvretrieve_cb, &ctx, i, 0);
+		rc = spdk_nvme_ns_cmd_kvretrievev(ns_entry->ns, ns_entry->qpair, key, key_len,
+							ctx.buffer_len,
+							run_kvretrieve_cb, &ctx, i, 0, nvme_request_reset_sgl, nvme_request_next_sge);
 		if (rc != 0) {
 			fprintf(stderr, "run_kvretrieve: ERROR: spdk_nvme_ns_cmd_kvretrieve() returned error: %d\n", rc);
 			spdk_free(ctx.buffer);
@@ -480,7 +545,7 @@ run_kvretrieve(struct ns_entry *ns_entry, char *key, size_t key_len, uint16_t ex
 
 /* used for both kvselect_send and kvselect_retrieve */
 struct run_kvselect_ctx {
-	struct base_ctx	_base_ctx;
+	struct io_request	_base_ctx;
 	char			*query;
 	char			*buffer;
 	size_t			buffer_len;
@@ -510,16 +575,21 @@ run_kvselect_send(struct ns_entry *ns_entry, char *key, size_t key_len, char *qu
 	struct run_kvselect_ctx 	ctx;
 
 	memset(&ctx, 0, sizeof(struct run_kvselect_ctx));
-	ctx._base_ctx.ns_entry = ns_entry;
 	ctx.query = query;
 	ctx._base_ctx.exp_status.sc = exp_sc;
 
-	rc = spdk_nvme_ns_cmd_kvselect_send(ns_entry->ns, ns_entry->qpair, key, key_len,
-					    query, SPDK_NVME_KV_DATATYPE_PARQUET, SPDK_NVME_KV_DATATYPE_CSV,
+	ctx._base_ctx.iovs[0].base = query;
+	ctx._base_ctx.iovs[0].len = 6;
+	ctx._base_ctx.iovs[1].base = query + 6;
+	ctx._base_ctx.iovs[1].len = strlen(query) + 1 - 6;
+	ctx._base_ctx.nseg = 2;
+
+	rc = spdk_nvme_ns_cmd_kvselect_sendv(ns_entry->ns, ns_entry->qpair, key, key_len,
+					    strlen(query), SPDK_NVME_KV_DATATYPE_PARQUET, SPDK_NVME_KV_DATATYPE_CSV,
 					    SPDK_NVME_KV_SELECT_OUTPUT_HEADER,
-					     run_kvselect_send_cb, &ctx, 0);
+					    run_kvselect_send_cb, &ctx, 0, nvme_request_reset_sgl, nvme_request_next_sge);
 	if (rc != 0) {
-		fprintf(stderr, "run_kvselect_send: ERROR: spdk_nvme_ns_cmd_kvexist() returned error: %d\n", rc);
+		fprintf(stderr, "run_kvselect_send: ERROR: spdk_nvme_ns_cmd_kvselect_sendv() returned error: %d\n", rc);
 		return -1;
 	}
 
@@ -561,7 +631,6 @@ run_kvselect_retr(struct ns_entry *ns_entry, uint32_t select_id, void *buffer, s
 	struct run_kvselect_ctx 	ctx;
 
 	memset(&ctx, 0, sizeof(struct run_kvselect_ctx));
-	ctx._base_ctx.ns_entry = ns_entry;
 	ctx._base_ctx.exp_status.sc = exp_sc;
 	ctx.select_id = select_id;
 	ctx.buffer = buffer;
@@ -569,9 +638,15 @@ run_kvselect_retr(struct ns_entry *ns_entry, uint32_t select_id, void *buffer, s
 	ctx.expected_value = exp_value;
 	ctx.expected_value_len = strlen(exp_value);
 
+	ctx._base_ctx.iovs[0].base = buffer;
+	ctx._base_ctx.iovs[0].len = 6;
+	ctx._base_ctx.iovs[1].base = buffer + 6;
+	ctx._base_ctx.iovs[1].len = buffer_size - 6;
+	ctx._base_ctx.nseg = 2;
+
 	for (ctx.offset = 0; ctx.offset < ctx.expected_value_len; ctx.offset += buffer_size) {
-		rc = spdk_nvme_ns_cmd_kvselect_retrieve(ns_entry->ns, ns_entry->qpair, select_id, ctx.offset,
-				buffer, buffer_size, SPDK_NVME_KV_SELECT_NO_FREE, run_kvselect_retr_cb, &ctx, 0);
+		rc = spdk_nvme_ns_cmd_kvselect_retrievev(ns_entry->ns, ns_entry->qpair, select_id, ctx.offset,
+				buffer_size, SPDK_NVME_KV_SELECT_NO_FREE, run_kvselect_retr_cb, &ctx, 0, nvme_request_reset_sgl, nvme_request_next_sge);
 		if (rc != 0) {
 			fprintf(stderr, "%s: ERROR: spdk_nvme_ns_cmd_kvselect_retrieve() returned error: %d\n", __FUNCTION__, rc);
 			return -1;
@@ -611,9 +686,11 @@ test_select(struct ns_entry *ns_entry) {
 	rc = run_kvstore(ns_entry, g_test_key4, strlen(g_test_key4), buffer, bytes, 0, 0);
 	ABORT_ON_FAIL(rc, "KV_STORE", g_test_key4);
 
-	char *query = "select s_name,s_address,s_city from s3object where s_nation = 'UNITED STATES'";
+	spdk_free(buffer);
+	buffer = spdk_zmalloc(buffer_len, g_block_size, NULL, SPDK_ENV_LCORE_ID_ANY, SPDK_MALLOC_DMA);
+	strcpy(buffer, "select s_name,s_address,s_city from s3object where s_nation = 'UNITED STATES'");
 
-	rc = run_kvselect_send(ns_entry, g_test_key4, strlen(g_test_key4), query, &select_id, SPDK_NVME_SC_SUCCESS);
+	rc = run_kvselect_send(ns_entry, g_test_key4, strlen(g_test_key4), buffer, &select_id, SPDK_NVME_SC_SUCCESS);
 	ABORT_ON_FAIL(rc, "KV_SELECT_SEND", g_test_key4);
 
 	spdk_free(buffer);
